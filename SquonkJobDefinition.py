@@ -9,6 +9,7 @@
 """
 
 import configparser
+import logging
 import shutil, os
 import requests
 # import curlify
@@ -45,34 +46,45 @@ class SquonkJobDefinition:
         self.inputs = []
         self.options = []
 
-# set job definition from service info 
+    # set job definition from service info 
     def get_definition(self,job_json):
         self.inputs = job_json['inputDescriptors']
         self.options = job_json['optionDescriptors']
 
-# write out a template yaml file from the definition
-    def template(self, yaml_name):
-        data = self.defaults()
+    # write out a template yaml file from the definition
+    def template(self, yaml_name, format='squonk'):
+        data = self.defaults(format)
         with open(yaml_name, 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
 
+    # get the file types expected for a given InputDescriptor from the 
+    # service definition
     def _get_file_types(self,input):
             media_type = input['mediaType']
             if media_type in file_types:
                 return file_types[media_type]
             else:
                 raise Exception('SquonkJobDefinition unknown media type: ' + media_type)
-# create default options and files from the definition
-    def defaults(self):
+
+    # create default options and files from the service definition
+    def defaults(self,format='squonk'):
         data = { 'service_name' : self._service,
-                 'input_data' : {},
+                 'inputs' : {},
                  'options' : {} }
+        file_type_key = format
+        if format== 'squonk':
+            file_type_key = 'data'
+        
+        # defaults for the input files
         for input in self.inputs:
             file_types = self._get_file_types(input)
-            input_data = { 'data' : 'data_file' }
-            if 'meta' in file_types:
-                input_data['meta'] = 'meta_data_file'
-            data['input_data'][input['name']] = input_data
+            input_data = { file_type_key : 'data_file' }
+            if format == 'squonk':
+                if 'meta' in file_types:
+                    input_data['meta'] = 'meta_data_file'
+            data['inputs'][input['name']] = input_data
+
+        # defaults for the options
         for option in self.options:
             type = option['typeDescriptor']['type']
             key = option['key']
@@ -90,13 +102,28 @@ class SquonkJobDefinition:
         for input in self.inputs:
             name = input['name']
             input_value = inputs[name]
-            print(input)
+            format = 'error'
+            if 'data' in input_value:
+                format = 'data'
+            if 'mol' in input_value:
+                format = 'mol'
+            if 'sdf' in input_value:
+                format = 'sdf'
+            if format == 'error':
+                logging.error('File type should be data, sdf or mol in:'+str(input_value))
+                return false
+            
             file_types = self._get_file_types(input)
             file = { 'name' : name,
-                     'data' : input_value['data'],
+                     'format' : format,
+                     'data' : input_value[format],
                      'type' : file_types['data']['mime'] }
             if 'meta' in file_types:
-                file['meta_data'] = input_value['meta']
+                if format == 'data':
+                    if not 'meta' in input_value:
+                        logging.error('Missing meta keyword in:'+str(input_value))
+                        return False
+                    file['meta_data'] = input_value['meta']
                 file['meta_type'] = file_types['meta']['mime']
             files.append(file)
         return files

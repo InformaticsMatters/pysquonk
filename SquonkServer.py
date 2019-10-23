@@ -9,7 +9,10 @@ import json
 import logging
 from email.policy import default
 from collections import namedtuple
-from .SquonkAuth import SquonkAuth
+try:
+    from .SquonkAuth import SquonkAuth
+except:
+    from SquonkAuth import SquonkAuth
 from collections import namedtuple
 
 # The search result.

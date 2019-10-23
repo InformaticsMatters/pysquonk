@@ -18,9 +18,8 @@ parameters passed in and then run a job. See example program below:
     # create squonk object from config
     squonk = Squonk(config=config)
 
-    # save yaml template
-    # TODO - option to pass in sdf type, as opposed to data/meta
-    squonk.job_yaml_template('slice_template.yaml', 'core.dataset.filter.slice.v1')
+    # save yaml template for squonk format (others are sdf and mol)
+    squonk.job_yaml_template('slice_template.yaml', 'core.dataset.filter.slice.v1', 'squonk')
 
     # job with inputs from parameters
 
@@ -39,15 +38,28 @@ parameters passed in and then run a job. See example program below:
 """
 
 import configparser
+import argparse
 import json
 import logging
 import time
 import sys
 from requests_toolbelt.multipart import decoder
-from .SquonkAuth import SquonkAuth
-from .SquonkServer import SquonkServer
-from .SquonkJobDefinition import SquonkJobDefinition
-from .SquonkJob import SquonkJob
+try:
+    from .SquonkAuth import SquonkAuth
+except:
+    from SquonkAuth import SquonkAuth
+try:
+    from .SquonkServer import SquonkServer
+except:
+    from SquonkServer import SquonkServer
+try:
+    from .SquonkJobDefinition import SquonkJobDefinition
+except:
+    from SquonkJobDefinition import SquonkJobDefinition
+try:
+    from .SquonkJob import SquonkJob
+except:
+    from SquonkJob import SquonkJob
 
 # The version of this module.
 # Modify with every change, complying with
@@ -66,7 +78,7 @@ output_content_types = {
 
 class Squonk:
 
-    def __init__(self,config_file='config.ini', config=None):
+    def __init__(self,config_file='config.ini', config=None, user=None, password=None):
         """
         Instantiate a Squonk object.
 
@@ -74,15 +86,19 @@ class Squonk:
         Pass in configuration information such as urls , end points
         and username and password. Can be supplied via a config_file
         or a dictionary passed as an input parameter.
-        If config is specified, then that is uses otherwise it attempts
+        If config is specified, then that is used otherwise it attempts
         to read config_file.
 
         Parameters
         ----------
         config_file : str
             Name of the configuration file. defaults to config.ini
-        arg2 : dict
+        config : dict
             Configuration information
+        user : str
+            Username to override the config
+        password : str
+            Password to override the config
 
         Returns
         -------
@@ -91,7 +107,6 @@ class Squonk:
 
         """
 
-        # TODO - should we look for config in ENV variable DIR ?
         # if config is passed in then use that
         if config:
             self._config = config
@@ -103,15 +118,21 @@ class Squonk:
             settings.read(config_file)
 
             self._config['client_id'] = settings.get('token', 'client_id')
-        # TODO - change ini file format ? eg to yaml
-        # TODO client secret
-        # self.token_client_secret = settings.get('token', 'client_secret')
-            self._config['username'] = settings.get('token', 'username')
-            self._config['password'] = settings.get('token', 'password')
+            if 'client_secret' in settings['token']:
+                self.token_client_secret = settings.get('token', 'client_secret')
+            else:
+                self._config['username'] = settings.get('token', 'username')
+                self._config['password'] = settings.get('token', 'password')
             self._config['auth_url'] = settings.get('token', 'url')
             self._config['base_url'] = settings.get('general', 'base_url')
             self._config['services_endpoint'] = settings.get('ids', 'endpoint')
             self._config['jobs_endpoint'] = settings.get('job', 'endpoint')
+
+        # override username and password if passed in
+        if user:
+            self._config['username'] = user
+        if password:
+            self._config['password'] = password
 
         logging.debug(json.dumps(self._config))
         # Validate the config
@@ -149,7 +170,7 @@ class Squonk:
         if response:
             return response.json()
         else:
-            print("ERROR: failed to get list of services")
+            logging.error("failed to get list of services")
             return []
 
     def list_service_ids(self):
@@ -212,6 +233,7 @@ class Squonk:
 
         """
 
+        logging.debug('getting info for service:'+service_id)
         response = self.server.send('get', self._config['services_endpoint'] + '/' + service_id)
         if response:
             return response.json()
@@ -242,7 +264,7 @@ class Squonk:
         else:
             return ''
 
-    def job_yaml_template(self, filename, service):
+    def job_yaml_template(self, filename, service, format='squonk'):
         """
         Outputs a yaml template for a specified service.
 
@@ -255,23 +277,52 @@ class Squonk:
             Name of the file to write to
         service : str
             Name of the service eg core.dataset.filter.slice.v1
+        format : str (optional)
+            Format that the input data files will be in. squonk, mod, or sdf.
+            The default is squonk
 
         """
         job_def = SquonkJobDefinition(service)
         info = self.list_full_service_info(service)
-        response = job_def.get_definition(info)
-        if response:
-            job_def.template(filename)
-        return response
-# 
-# TODO - don't send job class back, combine it with:
-#            run()
-#            options 2 yaml
-#            yaml 2 options
-#
-    def create_job(self, service=None, options={}, inputs=[], yaml=None):
+        if info:
+            job_def.get_definition(info)
+            job_def.template(filename, format)
+        else:
+            logging.error('Failed to get service definition from server')
+
+    def yaml_from_inputs(self, service=None, options={}, inputs=[], yaml=None):
         """
-        Create a Squonk job
+        Generates a yaml file from job inputs specified 
+
+        The input options for the job can be defined either by parameters
+        passed into the function or read from a yaml file. The values supplied
+        via parameters are validated against the service definition which is
+        retreived from the server.
+
+        Parameters
+        ----------
+        service : str
+            Name of the service eg core.dataset.filter.slice.v1
+        options : dict
+            The jobs options in the form of a dictionary
+        inputs : dict
+            The jobs file inputs in the form of a dictionary
+        yaml : str
+            The name of a yaml file defining the job that will be generated.
+
+        Returns
+        -------
+
+        """
+        job = SquonkJob(self.server,service=service, options=options, inputs=inputs, end_point= self._config['jobs_endpoint'])
+        if job.check_input():
+            info = self.list_full_service_info(service)
+            job.initialise(info)
+            job.write_yaml(yaml)
+
+    def run_job(self, service=None, options={}, inputs=[], yaml=None):
+        """
+        Runs a Squonk job
 
         The input options for the job can be defined either by parameters
         passed into the function or read from a yaml file. If the yaml
@@ -288,20 +339,34 @@ class Squonk:
         inputs : dict
             The jobs file inputs in the form of a dictionary
         yaml : str
-            A yaml file defining the job. A template file cna be generated
+            A yaml file defining the job. A template file can be generated
             using the function job_yaml_template
 
         Returns
         -------
-        SquonkJob
-            A squonk job object which can be used to run the job.
+        job_id : str
+            The id of the job that has been started.
 
         """
 
+        # create job
         job = SquonkJob(self.server,service=service, options=options, inputs=inputs, yaml=yaml, end_point= self._config['jobs_endpoint'])
-        info = self.list_full_service_info(service)
-        job.initialise(info)
-        return job
+
+        # check the input
+        if job.check_input():
+
+            # get service defintition
+            info = self.list_full_service_info(job.get_service())
+
+            # initialise job including validation against serfice definition
+            job.initialise(info)
+
+            # start job
+            job_id = job.start()
+
+            return job_id
+        else:
+            return False
 
     # get your jobs
     def list_jobs(self):
@@ -408,7 +473,7 @@ class Squonk:
         RESULTS_READY then reteives the jobs results.
 
         File created from the job are saved to the current directory or
-        the specified direectory
+        the specified directory
 
         Parameters
         ----------
@@ -430,7 +495,7 @@ class Squonk:
         status = 'RUNNING'
         while status=='RUNNING':
             status = self.job_status(job_id)
-            print(status)
+            print('Job status:{} waiting for {} seconds'.format(status,sleep))
             time.sleep(sleep)
         if status == 'RESULTS_READY':
             self.job_results(job_id, dir)
@@ -501,7 +566,7 @@ class Squonk:
     def _write_file(self,part,dir):
         file_name = self._get_filename(part.headers)
         if dir:
-            file_name = dir + '/' + file_name
+            file_name = os.path.join( dir, file_name)
         logging.debug(file_name)
         content = part.content.decode()
         content_json=json.loads(content)
@@ -518,24 +583,50 @@ class Squonk:
 
 if __name__ == '__main__':
 
-    logging.basicConfig(level=logging.DEBUG)
 
-    # Create a Squonk object
-    squonk = Squonk()
 
     # Get command line
-    input = sys.argv[1]
+    parser = argparse.ArgumentParser(description='Run Squonk from Python')
+    parser.add_argument("-r", "--run", type=str, action="store", dest="yaml", help="Run job defined by specified yaml file (use --template to generate an example)", default=None)
+    parser.add_argument("-t", "--template", type=str, action="store", dest="service", help="name of service to generate a yaml template from", default=None)
+    parser.add_argument("-f", "--format", type=str, action="store", dest="format", help="data format to generate the yaml template for ", default='squonk', choices=['squonk','mol','sdf'])
+    parser.add_argument("-d", "--debug", action="store_true", dest="debug", help="output debug messages", default=False)
+    parser.add_argument("-w", "--wait", type=int, action="store", dest="wait", help="wait time in seconds between checks for job finishing", default=10)
+    parser.add_argument("-o", "--output", type=str, action="store", dest="dir", help="directory to write output to either job output or template generation", default=None)
+    parser.add_argument("-u", "--user", type=str, action="store", dest="user", help="usrname to override the one in the config file", default=None)
+    parser.add_argument("-p", "--password", type=str, action="store", dest="password", help="password to override the one in the config file", default=None)
+    args = parser.parse_args()
+
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+        logging.debug("Job wait time: " + str(args.wait))
+    if args.yaml:
+        logging.debug("Got yaml file: " + args.yaml)
+    if args.service:
+        logging.debug("Got service: " + args.service)
+ 
+    if not args.service and not args.yaml:
+        print("You must specify --template or --yaml")
+    if args.service and args.yaml:
+        print("You can't specify --template and --yaml")
+
+    # Create a Squonk object
+    squonk = Squonk(user=args.user, password=args.password)
 
     # its a .yaml file, then run the job
-    if input.endswith('.yaml'):
-        print('Input: ' + input + ' assuming job yaml file, running job')
-        job = squonk.create_job(yaml=input)
-        job_id = job.start()
-        print('submitted job: ' + job_id)
-        # wait for job to finish and get the results
-        squonk.job_wait(job_id)
+    if args.yaml:
+        input=args.yaml
+        logging.info('Running job from yaml file: '+input)
+        job_id = squonk.run_job(yaml=input)
+        if job_id:
+            logging.info('submitted job: ' + job_id)
+            # wait for job to finish and get the results
+            squonk.job_wait(job_id, sleep=args.wait)
 
     # Otherwise assume its a service name and write a yaml template
-    else:
-        print('Input: ' + input + ' assuming service name')
-        squonk.job_yaml_template(input+'.yaml', input)
+    if args.service:
+        file_name = args.service
+        if args.dir:
+            file_name = os.path.join(args.dir, file_name)
+        logging.info('Writing out file ' + file_name )
+        squonk.job_yaml_template(args.service+'.yaml', file_name, args.format)
