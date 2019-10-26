@@ -1,0 +1,4 @@
+The documentation in here was created by running:
+  pdoc squonk.py -o doc --force
+
+from the top level directory
