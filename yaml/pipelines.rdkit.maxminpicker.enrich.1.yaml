@@ -1,0 +1,14 @@
+service_name: pipelines.rdkit.maxminpicker.enrich.1
+inputs:
+  input:
+    data: data/Building_blocks_GBP.data.gz
+    meta: data/Building_blocks_GBP.metadata
+  seeds:
+    data: data/Kinase_inhibs.json.gz
+    meta: data/Kinase_inhibs.metadata
+options:
+  arg.descriptor: maccs
+  arg.fragment_method: hac
+  arg.num: 100
+  arg.threshold: 0.5
+  arg.output_fragment: 'False'

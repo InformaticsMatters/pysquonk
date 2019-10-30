@@ -1,0 +1,8 @@
+service_name: pipelines.rdkit.sucos.basic
+inputs:
+  input:
+    sdf: data/mols.sdf
+  target:
+    sdf: data/benzene.sdf
+options:
+  arg.targetidx: 1

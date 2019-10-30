@@ -1,0 +1,9 @@
+service_name: pipelines.rdkit.o3da.basic
+inputs:
+  input:
+    data: data/Kinase_inhibs.json.gz
+    meta: data/Kinase_inhibs.metadata
+  queryMol:
+    mol: data/pyrimethamine.mol
+options:
+  arg.crippen: 'false'

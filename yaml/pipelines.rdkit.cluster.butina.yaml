@@ -1,0 +1,12 @@
+service_name: pipelines.rdkit.cluster.butina
+inputs:
+  input:
+    data: data/Kinase_inhibs.json.gz
+    meta: data/Kinase_inhibs.metadata
+options:
+    arg.threshold: 0.7
+# arg.threshold: ['java.lang.Float', 0.7]
+# arg.fragment_method: hac # hac, mw
+# arg.output_fragment: False
+    arg.descriptor: rdkit # maccs, morgan2, morgan3, rdkit
+    arg.metric: tanimoto # asymmetric, braunblanquet, cosine, dice, kulczynski, mcconnaughey, rogotgoldberg, russel, sokal, tanimoto
