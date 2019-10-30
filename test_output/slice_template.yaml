@@ -1,0 +1,8 @@
+service_name: core.dataset.filter.slice.v1
+inputs:
+  input:
+    data: data_file
+    meta: meta_data_file
+options:
+  skip: 1
+  count: 1
