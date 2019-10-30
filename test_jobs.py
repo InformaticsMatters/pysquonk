@@ -53,7 +53,7 @@ for yaml in yamls:
     file_base, file_ext = os.path.splitext(yaml)
     # start job
     print('run_job: ' + file_base)
-    outdir = 'job_output/' + file_base
+    outdir = 'test_output/' + file_base
     if not os.path.exists(outdir):
         os.mkdir(outdir)
     job_id = squonk.run_job(yaml=yaml)

@@ -12,9 +12,7 @@ import configparser
 import logging
 import shutil, os
 import requests
-# import curlify
 import json
-# from functions import check_response
 import yaml
 from requests_toolbelt.multipart import decoder
 from email.parser import BytesParser, Parser
@@ -53,9 +51,14 @@ class SquonkJobDefinition:
 
     # write out a template yaml file from the definition
     def template(self, yaml_name, format='squonk'):
-        data = self.defaults(format)
+        inputs = {'inputs' : self.default_inputs(format) }
+        options = self.default_options()
         with open(yaml_name, 'w') as outfile:
-            yaml.dump(data, outfile, default_flow_style=False)
+            outfile.write("service_name: " + self._service + "\n")
+            yaml.dump(inputs, outfile, default_flow_style=False)
+            outfile.write("options:\n")
+            for option in options:
+                outfile.write(option + "\n")
 
     # get the file types expected for a given InputDescriptor from the 
     # service definition
@@ -66,11 +69,9 @@ class SquonkJobDefinition:
             else:
                 raise Exception('SquonkJobDefinition unknown media type: ' + media_type)
 
-    # create default options and files from the service definition
-    def defaults(self,format='squonk'):
-        data = { 'service_name' : self._service,
-                 'inputs' : {},
-                 'options' : {} }
+    # create default files from the service definition
+    def default_inputs(self,format='squonk'):
+        data = {}
         file_type_key = format
         if format== 'squonk':
             file_type_key = 'data'
@@ -82,18 +83,52 @@ class SquonkJobDefinition:
             if format == 'squonk':
                 if 'meta' in file_types:
                     input_data['meta'] = 'meta_data_file'
-            data['inputs'][input['name']] = input_data
+            data[input['name']] = input_data
+        return data
 
-        # defaults for the options
+    # defaults for the options
+    def default_options(self):
+        data = []
         for option in self.options:
+
+            # set a default depending on type.
+
             type = option['typeDescriptor']['type']
-            key = option['key']
-            value = 'id'
+            value = "'id'"
             if type == 'java.lang.Integer':
-                value = 1
+                value = "1"
             if type == 'java.lang.Float':
-                value = 1.0
-            data['options'][key] = value
+                value = "1.0"
+            if type == 'java.lang.Boolean':
+                value = "'false'"
+            if type == 'org.squonk.types.NumberRange$Float':
+                value = "'1.0|4.0'"
+            if type == 'org.squonk.types.NumberRange$Integer':
+                value = "'1|4'"
+
+            # put service default value in if there is one.
+            if 'defaultValue' in option:
+                value = str(option['defaultValue'])
+
+            # put the possible values in as a comment.
+            if 'values' in option:
+                val_string = ", " . join(option['values'])
+                value = value + " # " + val_string
+
+            # compose yaml
+
+            key = option['key']
+            yaml_line = "  " + key + ": " + value
+
+            # comment out the value if there is a default
+
+            min=0
+            if 'minValues' in option:
+                min = option['minValues']
+            if 'defaultValue' in option and min==0:
+                yaml_line = '#' + yaml_line[1:]
+            data.append(yaml_line)
+
         return data
 
 # get the files data to create a job
@@ -128,16 +163,19 @@ class SquonkJobDefinition:
             files.append(file)
         return files
 
-# validate the job inputs against the service definition
+    # validate the job inputs against the service definition
     def validate(self,options,inputs):
         expected_options = {}
         # loop round the expected options (json) and
         # check they exist - presumably can be left out if default value?
         for option_json in self.options:
             key = option_json['key']
-            min = option_json['minValues']
+            logging.debug('validate:'+key)
+            min = 0
+            if 'minValues' in option_json:
+                min = option_json['minValues']
             expected_options[key] = option_json
-            if not 'default_value' in option_json and min>0:
+            if not 'defaultValue' in option_json and min>0:
                 if not key in options:
                     print("ERROR: missing job option: " + key)
                     return False
@@ -147,7 +185,9 @@ class SquonkJobDefinition:
             if key in expected_options:
                 options_json = expected_options[key]
                 type = option_json['typeDescriptor']['type']
-                max = option_json['maxValues']
+                max = 1
+                if 'maxValues' in option_json:
+                    max = option_json['maxValues']
                 if self.correct_type(options[key],type):
                     return False
 
@@ -176,21 +216,27 @@ class SquonkJobDefinition:
         if type=='java.lang.Integer':
             if isinstance(value, int):
                 return True
-#           try: 
-#               int(value)
-#               return True
-#           except ValueError:
-#               return False
         if type=='java.lang.Float':
-            if isinstance(value, int):
+            if isinstance(value, float):
                 return True
-#           try: 
-#               float(value)
-#               return True
-#           except ValueError:
-#               return False
         if type=='java.lang.String':
             if isinstance(value, int):
                 return True
+        if type == 'org.squonk.types.NumberRange$Integer':
+            return _range(value, int)
+        if type == 'org.squonk.types.NumberRange$Float':
+            return _range(value, float)
 
         return False
+
+# verify a range parameter is 2 values seperated by pipe 1.0|1.0
+def _range(value,type_):
+    vals = value.split('|')
+    if len(vals) != 2:
+        return False
+    if not isinstance(vals[0], type):
+        return False
+    if not isinstance(vals[1], type):
+        return False
+    
+    return True

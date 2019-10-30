@@ -13,16 +13,18 @@ import requests
 # import auth
 import json
 import yaml
+import io
 import logging as log
 from requests_toolbelt.multipart import decoder
 from email.parser import BytesParser, Parser
 from email.policy import default
+from tempfile import mkstemp
 try:
     from .SquonkJobDefinition import SquonkJobDefinition
-    from .utils import tosquonk
+    from .utils import tosquonk, mol2sdf
 except:
     from SquonkJobDefinition import SquonkJobDefinition
-    from utils import tosquonk
+    from utils import tosquonk, mol2sdf
 
 class SquonkJob:
 
@@ -38,7 +40,7 @@ class SquonkJob:
     def check_input(self):
         # if there is yaml read it, loading in:
         if self._yaml:
-            job_yaml = yaml.load(open(self._yaml))
+            job_yaml = yaml.full_load(open(self._yaml))
 
             # check the yaml file contains the sections we expect
             for section in ['service_name','options','inputs']:
@@ -47,6 +49,8 @@ class SquonkJob:
                     return False
             self._service = job_yaml['service_name']
             self._options = job_yaml['options']
+            if not self._options:
+                self._options = {}
             self._inputs = job_yaml['inputs']
    
         # check we have some files or options
@@ -81,7 +85,6 @@ class SquonkJob:
         return response
 
 # write out a yaml file from the job inputs
-# TODO - file content is in strange order
     def write_yaml(self, yaml_name):
         data = { 'service_name' : self._service,
                  'input_data' : self._inputs,
@@ -89,17 +92,19 @@ class SquonkJob:
         with open(yaml_name, 'w') as outfile:
             yaml.dump(data, outfile, default_flow_style=False)
 
-# validate the job inputs against the service definition
+    # validate the job inputs against the service definition
     def validate(self):
         self.job_def.validate(self._options, self._inputs)
 
-# run the job 
-    def start(self):
+    # run the job 
+    def start(self, convert_on_server=True):
         """
         Submit the job to the server
 
         Parameters
         ----------
+        boolean (default - True)
+            convert_on_server
 
         Returns
         -------
@@ -122,37 +127,60 @@ class SquonkJob:
 
         data_opt_str = '{}'.format(self._options)
         data_opt_str = data_opt_str.replace("'", '"')
+        log.debug(data_opt_str)
+
         form_data = { 'options': data_opt_str }
 
         # for each file, send a tuple consisting of:
         #  name, data (file object or string), mime type
 
         for file in files:
+           log.debug(str(file))
            format = file['format']
            key = file['name'] + '_data'
 
            # If we have squonk format files then open them.
 
            if format == 'data':
+               log.debug('Adding key:' + key + ' type:' + file['type'])
                form_data[key] = ( key, open(file['data'], 'rb'), file['type'])
                if 'meta_data' in file:
                    key = file['name'] + '_metadata'
                    form_data[key] = ( key, open(file['meta_data'], 'rb'), file['meta_type'])
 
-           # otherwise we have mol or sdf so convert them to strings.
+           # otherwise we have mol or sdf
 
            else:
-               file_data, file_meta, rcode = tosquonk(file['data'], format)
-               if rcode == 0:
-                   form_data[key] = ( key, file_data, file['type'])
-                   if 'meta_data' in file:
-                       key = file['name'] + '_metadata'
-                       form_data[key] = ( key, file_meta, file['type'])
+               # conversion can be done on the server
+               if convert_on_server:
+                   key = file['name']
+                   file_type = 'chemical/x-mdl-sdfile'
+                   log.debug('Adding key:' + key + ' type:' + file_type)
+                   # mol can be converted to sdf first
+                   if format == 'mol':
+                       file_data = mol2sdf(file['data'])
+                       form_data[key] = ( key, file_data, file_type)
+                   # sdf can be processed directly
+                   else:
+                       form_data[key] = ( key, open(file['data'], 'rb'), file_type)
                else:
-                   return False
+                   # note: client conversion not fully tested.
+                   log.debug('Converting format on client:'+format)
+                   file_data, file_meta, rcode = tosquonk(file['data'], format)
+                   if rcode == 0:
+                       json_str = json.dumps(file_data)
+                       log.debug('Adding key:' + key + ' type:' + file['type'])
+                       form_data[key] = ( key, json.dumps(file_data), file['type'])
+                       if 'meta_type' in file:
+                           key = file['name'] + '_metadata'
+                           log.debug('Adding key:' + key + ' type:' + file['type'])
+                           json_str = json.dumps(file_meta)
+                           form_data[key] = ( key, json.dumps(file_meta), file['meta_type'])
+                   else:
+                       return False
 
         # send the request
-        log.debug(form_data)
+#       log.debug(form_data)
         response = self._server.send('post', self._end_point + self._service, form_data)
 
         # if it worked, then get the job id
@@ -160,7 +188,8 @@ class SquonkJob:
         if response:
             job_status = response.json()
             self._job_id = job_status['jobId']
-            log.debug("Job Status: " + str(job_status) + " JobID: " + self._job_id)
+            status = job_status['status']
+            log.debug("Job Status: " + str(status) + " JobID: " + self._job_id)
             return self._job_id
         else:
             return response

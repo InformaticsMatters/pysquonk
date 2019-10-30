@@ -1,6 +1,9 @@
 #! /usr/bin/env python
 """A Python wrapper around the Informatics Matters Squonk REST API.
 
+pysquonk.py can just be run as a main program. To see the help run:  
+  pysquonk/squonk.py -h
+
 Workflow is to create a Squonk instance from either a config file or
 parameters passed in and then run a job. See example program below:
 
@@ -29,12 +32,10 @@ parameters passed in and then run a job. See example program below:
                 'meta' : '../data/testfiles/Kinase_inhibs.metadata' }
         }
     service = 'core.dataset.filter.slice.v1'
-    job = squonk.create_job(service, options, inputs)
-
     # start job
-    job_id = job.start()
+    job_id = squonk.run_job(service, options, inputs)
+
     squonk.job_wait(job_id)
-    squonk.job_delete(job_id)
 """
 
 import configparser
@@ -43,11 +44,12 @@ import json
 import logging
 import time
 import sys
+import os
 from requests_toolbelt.multipart import decoder
 try:
-    from .SquonkAuth import SquonkAuth
+    from .SquonkAuth import SquonkAuth, SquonkAuthException
 except:
-    from SquonkAuth import SquonkAuth
+    from SquonkAuth import SquonkAuth, SquonkAuthException
 try:
     from .SquonkServer import SquonkServer
 except:
@@ -76,6 +78,11 @@ output_content_types = {
    'image/png': 'write_file',
    'chemical/x-mol2': 'write_file'}
 
+# test for gzip
+
+def _is_gzip(content):
+    return content[:2]==b'1f8b'
+
 class Squonk:
 
     def __init__(self,config_file='config.ini', config=None, user=None, password=None):
@@ -102,15 +109,16 @@ class Squonk:
 
         Returns
         -------
-        int
-            Description of return value
 
         """
 
         # if config is passed in then use that
+
         if config:
             self._config = config
+
         # otherwise read the config file
+
         else:
             self._config = {}
             settings = configparser.ConfigParser()
@@ -151,6 +159,30 @@ class Squonk:
 
         # create SquonkServer object
         self.server = SquonkServer(sa, self._config['base_url'])
+
+    def ping(self):
+        """
+        Checks that the service can be reached.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        boolean
+            True if ok, False otherwise.
+
+        """
+
+        response = self.server.send('get', 'ping')
+        if response:
+            status_code = response.status_code
+            if status_code == 200:
+                return True
+            else:
+                return False
+        else:
+            return False
 
     def list_services(self):
         """
@@ -320,7 +352,7 @@ class Squonk:
             job.initialise(info)
             job.write_yaml(yaml)
 
-    def run_job(self, service=None, options={}, inputs=[], yaml=None):
+    def run_job(self, service=None, options={}, inputs=[], yaml=None, convert_onserver=True):
         """
         Runs a Squonk job
 
@@ -358,11 +390,11 @@ class Squonk:
             # get service defintition
             info = self.list_full_service_info(job.get_service())
 
-            # initialise job including validation against serfice definition
+            # initialise job including validation against service definition
             job.initialise(info)
 
             # start job
-            job_id = job.start()
+            job_id = job.start(convert_onserver)
 
             return job_id
         else:
@@ -411,7 +443,7 @@ class Squonk:
 
         """
 
-        logging.debug('Deleting job ' + job_id)
+        logging.info('Deleting job ' + job_id)
         response = self.server.send('delete', self._config['jobs_endpoint'] + job_id)
         return response
 
@@ -432,7 +464,6 @@ class Squonk:
         for id in jobs:
             self.job_delete(id)
 
-    # get a jobs status
     def job_status(self,job_id):
         """
         Get the status of a job from its job_id
@@ -463,10 +494,14 @@ class Squonk:
         response = self.server.send('get', self._config['jobs_endpoint'] + job_id + '/status')
         if response:
             job_json = response.json()
-            status = job_json['status']
+            if 'status' in job_json:
+                status = job_json['status']
+            if status == 'ERROR':
+                logging.debug(json.dumps(job_json, indent=4))
+                if 'events' in job_json:
+                    print(json.dumps(job_json['events']))
             return status
 
-# wait for job to finish then get the results
     def job_wait(self, job_id, dir=None, sleep=10, delete=True):
         """
         Waits for the specified job to finish and if it reaches a status of
@@ -492,11 +527,11 @@ class Squonk:
         -------
 
         """
-        status = 'RUNNING'
+        status = self.job_status(job_id)
         while status=='RUNNING':
-            status = self.job_status(job_id)
             print('Job status:{} waiting for {} seconds'.format(status,sleep))
             time.sleep(sleep)
+            status = self.job_status(job_id)
         if status == 'RESULTS_READY':
             self.job_results(job_id, dir)
             if delete:
@@ -504,19 +539,23 @@ class Squonk:
         else:
             print('Job Failed status='+status)
 
+    # get content type from the header
     def _get_content_type(self,header):
         content_type = header['Content-Type'.encode()].decode()
         return content_type
 
+    # get filename from the header, if there is one.
     def _get_filename(self,header):
         filename=''
-        content_disp = header['Content-Disposition'.encode()].decode()
-        indx = content_disp.find('filename=')
-        if indx!= -1:
-            filenstr=content_disp[indx:]
-            indx = filenstr.find('=')
+        disp_key = 'Content-Disposition'.encode()
+        if disp_key in header:
+            content_disp = header[disp_key].decode()
+            indx = content_disp.find('filename=')
             if indx!= -1:
-                filename=filenstr[indx+1:]
+                filenstr=content_disp[indx:]
+                indx = filenstr.find('=')
+                if indx!= -1:
+                    filename=filenstr[indx+1:]
         return filename
 
     # get jobs results
@@ -542,6 +581,7 @@ class Squonk:
 
         """
 
+        logging.info('getting results for job: ' + job_id)
         response = self.server.send('get', self._config['jobs_endpoint'] + job_id + '/results')
         if not response:
             return response
@@ -552,44 +592,53 @@ class Squonk:
             count+=1
             logging.debug("HEADER =========PART:"+str(count))
             logging.debug(part.headers)
-# TODO perhaps we should just look at any file attachments and save them?
-            content_type = self._get_content_type(part.headers)
-            if content_type in output_content_types:
-                logging.debug("PROCESSING " + content_type)
-                self._write_file(part,dir)
-            else:
-                logging.debug("IGNORED " + content_type)
-#               logging.debug("PART ======= CONTENT =========")
-#               logging.debug(part.content)
+            self._write_file(part,dir)
         return response
 
+    # given part of a multipart response, write out a file.
+
     def _write_file(self,part,dir):
+
+        # get file name, if there is one
+
         file_name = self._get_filename(part.headers)
+        if len(file_name) < 2:
+            logging.debug('No filename, ignoring')
+            return
+
+        # if the file is not gzipped but ends in gz, remove the .gz
+
+        if not _is_gzip(part.content):
+            if file_name.endswith('.gz'):
+                file_name = file_name[:-3]
+
+        # if the user gave a directory, prepend to file name
+
         if dir:
             file_name = os.path.join( dir, file_name)
-        logging.debug(file_name)
+        logging.info('Writing: ' + file_name)
+
+        # write out the file.
         content = part.content.decode()
-        content_json=json.loads(content)
-        file_data=content_json[0]['source']
         with open(file_name, 'w') as f:
-            f.write(file_data)
+            f.write(content)
             f.close()
 
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
 
-# TODO help option, type for yaml template generation
-
 if __name__ == '__main__':
 
 
-
     # Get command line
+
     parser = argparse.ArgumentParser(description='Run Squonk from Python')
     parser.add_argument("-r", "--run", type=str, action="store", dest="yaml", help="Run job defined by specified yaml file (use --template to generate an example)", default=None)
-    parser.add_argument("-t", "--template", type=str, action="store", dest="service", help="name of service to generate a yaml template from", default=None)
+    parser.add_argument("-s", "--service", type=str, action="store", dest="service", help="name of service to generate a yaml template from", default=None)
+    parser.add_argument("-i", "--info", action="store_true", dest="info", help="output the service definition instead of creating a template", default=False)
     parser.add_argument("-f", "--format", type=str, action="store", dest="format", help="data format to generate the yaml template for ", default='squonk', choices=['squonk','mol','sdf'])
+    parser.add_argument("-c", "--client", action="store_true", dest="client", help="perform conversions from sdf or mol on the client (default is server)", default=False)
     parser.add_argument("-d", "--debug", action="store_true", dest="debug", help="output debug messages", default=False)
     parser.add_argument("-w", "--wait", type=int, action="store", dest="wait", help="wait time in seconds between checks for job finishing", default=10)
     parser.add_argument("-o", "--output", type=str, action="store", dest="dir", help="directory to write output to either job output or template generation", default=None)
@@ -597,9 +646,12 @@ if __name__ == '__main__':
     parser.add_argument("-p", "--password", type=str, action="store", dest="password", help="password to override the one in the config file", default=None)
     args = parser.parse_args()
 
+    # debug output
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
         logging.debug("Job wait time: " + str(args.wait))
+    else:
+        logging.basicConfig(level=logging.INFO)
     if args.yaml:
         logging.debug("Got yaml file: " + args.yaml)
     if args.service:
@@ -607,26 +659,41 @@ if __name__ == '__main__':
  
     if not args.service and not args.yaml:
         print("You must specify --template or --yaml")
+        exit()
     if args.service and args.yaml:
         print("You can't specify --template and --yaml")
+        exit()
 
     # Create a Squonk object
-    squonk = Squonk(user=args.user, password=args.password)
+    try:
+        squonk = Squonk(user=args.user, password=args.password)
+    except SquonkAuthException:
+        print('Failed to authenticate with squonk service. Check your username and password')
+        exit()
 
     # its a .yaml file, then run the job
     if args.yaml:
         input=args.yaml
         logging.info('Running job from yaml file: '+input)
-        job_id = squonk.run_job(yaml=input)
+        job_id = squonk.run_job(yaml=input, convert_onserver=not args.client)
         if job_id:
             logging.info('submitted job: ' + job_id)
             # wait for job to finish and get the results
-            squonk.job_wait(job_id, sleep=args.wait)
+            squonk.job_wait(job_id, sleep=args.wait, dir=args.dir)
 
-    # Otherwise assume its a service name and write a yaml template
+    # Otherwise assume its a service name
     if args.service:
         file_name = args.service
         if args.dir:
             file_name = os.path.join(args.dir, file_name)
-        logging.info('Writing out file ' + file_name )
-        squonk.job_yaml_template(args.service+'.yaml', file_name, args.format)
+        if args.info:
+            file_name += '.json'
+            info = squonk.list_full_service_info(args.service)
+            logging.info('Writing out file ' + file_name )
+            with open(file_name, 'w') as f:
+                f.write(json.dumps(info, indent=4))
+                f.close()
+        else:
+            file_name += '.yaml'
+            logging.info('Writing out file ' + file_name )
+            squonk.job_yaml_template(file_name, args.service, args.format)

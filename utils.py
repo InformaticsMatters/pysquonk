@@ -5,6 +5,7 @@
 import gzip
 import os
 import datetime
+import json
 from uuid import uuid1
 from logging import debug, error
 
@@ -12,6 +13,36 @@ from logging import debug, error
 # Modify with every change, complying with
 # semantic 2.0.0 rules.
 __version__ = '1.0.0'
+
+def mol2sdf(file_name):
+    """
+    Converts a mol format file to sdf by adding $$$$ onto the end.
+    Unzips the file first if it name ends in .gz
+
+    Parameters
+    ----------
+    file_name: str
+        name of the file. if it ends in gz is assumed to be gzipped
+
+    Returns
+    -------
+    Returns a string containing the file data
+    """
+
+    file_data = ''
+    file_base, file_ext = os.path.splitext(file_name)
+    if file_ext == '.gz':
+        file_base, file_ext = os.path.splitext(file_base)
+        debug('opening gzipped file:' + file_name)
+        with gzip.open(file_name, 'rt') as f:
+            file_data = f.read()
+    else:
+        debug('opening ordinary file:' + file_name)
+        with open(file_name, 'r') as f:
+            file_data = f.read()
+
+    file_data += "$$$$\n"
+    return file_data
 
 def tosquonk(file_name,type=None):
     """
@@ -83,12 +114,6 @@ def str2squonk(squonk_string, type, file_name):
     got_name=False
     names={}
     values={}
-    head_string='{"uuid":"' + str(uuid1()) + '","source":"'
-    mol_end='"'
-    format_string=', "format":"mol"'
-    opt_start=', "options":"{'
-    opt_end='}"'
-    tail_string='}'
     lines=squonk_string
     if(isinstance(lines,str)):
         lines=squonk_string.splitlines()
@@ -97,7 +122,8 @@ def str2squonk(squonk_string, type, file_name):
     date_string = today.strftime("%d-%b-%Y %H:%M:%S UTC")
 
     # start of the output data
-    data='['
+    mol_list = []
+#   data='['
 
     # process each line in the file
     for line in lines:
@@ -105,7 +131,9 @@ def str2squonk(squonk_string, type, file_name):
 
         # start a new molecule def
         if in_mol:
-            data += head_string
+            data = {}
+            data['uuid'] = str(uuid1())
+            mol_data = ''
             in_mol = False
             mol_count+=1
 
@@ -123,75 +151,74 @@ def str2squonk(squonk_string, type, file_name):
                     name = line[3:end_name+3]
                     names[name] = 1
         else:
-            data += line
-# TODO issue with end of line ??
-            data += "\n"
+            mol_data += line
+            mol_data += "\n"
 
         # found the end of a molecule
         if line.startswith('M  END'):
-            data += mol_end
-            data += format_string
+            data['source'] = mol_data
+            data['format'] ='mol'
             if type == 'sdf':
-                debug('in_opts sdf')
                 in_opts=True
                 values={}
             else:
                 in_mol = True
-                data += tail_string
 
         # found the end of options in sdf file
         if line.startswith('$$$$'):
             in_mol = True
             in_opts=False
 #           debug('end of opts sdf')
-            data += opt_start
-            val_strings=[]
+            val_strings={}
             for name, value in values.items():
-                 val_strings.append('"' + name + '":"' + value + '"')
-            data += ",".join(val_strings)
-            data += opt_end
-            data += tail_string
+                 val_strings[name] = value
+            data['values'] = val_strings
+            mol_list.append(data)
 
     # end of the data
-    data+=']'
 
-    meta_data=''
+    meta_data={}
     # sdf meta data
     if type == 'sdf':
         size = mol_count
-        meta_data = '{"type":"org.squonk.types.MoleculeObject","size":'
-        meta_data += str(size)
-        meta_data += ',"valueClassMappings":{'
-        val_strings=[]
+        meta_data['type'] = "org.squonk.types.MoleculeObject"
+        meta_data['size'] = size
+        val_strings={}
         for name in names.keys():
              type_str = 'java.lang.String'
-             val_strings.append('"' + name + '":"' + type_str + '"')
-        meta_data += ",".join(val_strings)
-        meta_data += '},"fieldMetaProps":['
+             val_strings[name] = type_str
+        meta_data['valueClassMappings'] = val_strings
+        base_name = os.path.basename(file_name)
+        metaprops = []
         for name in names.keys():
-            meta_data += metaprop(name,date_string,file_name)
-        meta_data += '], properties : {"created":"' + date_string
-        meta_data += '","source":"SD file: ' + file_name 
-        meta_data += '"","description":"Read from SD file: ' + file_name
-        meta_data += '","history":"'
+            metaprops.append(metaprop(name,date_string,base_name))
+        meta_data['fieldMetaProps'] = metaprops
+        properties = {}
+        properties['created'] = date_string
+        properties['source'] = 'SD file: ' + base_name 
+        properties['description'] = 'Read from SD file: ' + base_name
+        histories = []
         for name in names.keys():
-            meta_data += history(name,date_string,file_name)
-        meta_data += '"}}'
+            histories.append(history(name,date_string,file_name))
+        properties['history'] = "\n" . join(histories)
+        meta_data['properties'] = properties
 
-    return (data, meta_data, 0)
+    return (mol_list, meta_data, 0)
 
 # format a fields metaproperty entry
 def metaprop(field,date,filename):
-    data = '{"fieldName":"' + field + '","values":{"created":"'
-    data += date
-    data += '","source":"SD file: ' + filename + '"'
-    data += ',"description":"Data field from SDF","history":"['
-    data += date
-    data += ' Value read from SD file property"}}'
+    data = {}
+    data['fieldName'] = field
+    values = {}
+    values['created'] = date
+    values['source'] = 'SD file: ' + filename
+    values['description'] = 'Data field from SDF'
+    values['history'] = '[' + date + '] Value read from SD file property'
+    data['values'] = values
     return data
 
 # format a fields history entry
 def history(field,date,filename):
     data = '[' + date + ']'
-    data += ' Added field ' + field + '\n'
+    data += ' Added field ' + field
     return data

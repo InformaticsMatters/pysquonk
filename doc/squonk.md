@@ -2,8 +2,11 @@ Module squonk
 =============
 A Python wrapper around the Informatics Matters Squonk REST API.
 
+pysquonk.py can just be run as a main program. To see the help run:  
+  pysquonk/squonk.py -h
+
 Workflow is to create a Squonk instance from either a config file or
-parameters passed in and then run a job.
+parameters passed in and then run a job. See example program below:
 
     from squonk import Squonk
 
@@ -19,8 +22,8 @@ parameters passed in and then run a job.
     # create squonk object from config
     squonk = Squonk(config=config)
 
-    # save yaml template
-    squonk.job_yaml_template('slice_template.yaml', 'core.dataset.filter.slice.v1')
+    # save yaml template for squonk format (others are sdf and mol)
+    squonk.job_yaml_template('slice_template.yaml', 'core.dataset.filter.slice.v1', 'squonk')
 
     # job with inputs from parameters
 
@@ -30,65 +33,39 @@ parameters passed in and then run a job.
                 'meta' : '../data/testfiles/Kinase_inhibs.metadata' }
         }
     service = 'core.dataset.filter.slice.v1'
-    job = squonk.create_job(service, options, inputs)
-
     # start job
-    job_id = job.start()
+    job_id = squonk.run_job(service, options, inputs)
+
     squonk.job_wait(job_id)
-    squonk.job_delete(job_id)
 
 Classes
 -------
 
-`Squonk(config_file='config.ini', config=None)`
+`Squonk(config_file='config.ini', config=None, user=None, password=None)`
 :   Instantiate a Squonk object.
     
     Create a Squonk object for running the Squonk Python API.
     Pass in configuration information such as urls , end points
     and username and password. Can be supplied via a config_file
     or a dictionary passed as an input parameter.
-    If config is specified, then that is uses otherwise it attempts
+    If config is specified, then that is used otherwise it attempts
     to read config_file.
     
     Parameters
     ----------
     config_file : str
         Name of the configuration file. defaults to config.ini
-    arg2 : dict
+    config : dict
         Configuration information
+    user : str
+        Username to override the config
+    password : str
+        Password to override the config
     
     Returns
     -------
-    int
-        Description of return value
 
     ### Methods
-
-    `create_job(self, service=None, options={}, inputs=[], yaml=None)`
-    :   Create a Squonk job
-        
-        The input options for the job can be defined either by parameters
-        passed into the function or read from a yaml file. If the yaml
-        file is specified then it will be used in preference. The yaml file
-        or values supplied via parameters are validated against the service
-        definition which is retreived from the server.
-        
-        Parameters
-        ----------
-        service : str
-            Name of the service eg core.dataset.filter.slice.v1
-        options : dict
-            The jobs options in the form of a dictionary
-        inputs : dict
-            The jobs file inputs in the form of a dictionary
-        yaml : str
-            A yaml file defining the job. A template file cna be generated
-            using the function job_yaml_template
-        
-        Returns
-        -------
-        SquonkJob
-            A squonk job object which can be used to run the job.
 
     `job_delete(self, job_id)`
     :   Delete the specified job
@@ -156,12 +133,12 @@ Classes
             The job status eg RUNNING or RESULTS_READY or SQUOANK_API_ERROR if
             there was some error trying to obtain the job status
 
-    `job_wait(self, job_id, dir=None)`
+    `job_wait(self, job_id, dir=None, sleep=10, delete=True)`
     :   Waits for the specified job to finish and if it reaches a status of
         RESULTS_READY then reteives the jobs results.
         
         File created from the job are saved to the current directory or
-        the specified direectory
+        the specified directory
         
         Parameters
         ----------
@@ -169,11 +146,17 @@ Classes
             Description of arg1
         dir : str
             Optional directory to save the job output to.
+        sleep : int
+            Time in seconds to sleep for before checking results again.
+            Default is 10.
+        delete: boolean
+            True to delete the job after getting the results back successfully
+            or False to keep the job (optional: default is True)
         
         Returns
         -------
 
-    `job_yaml_template(self, filename, service)`
+    `job_yaml_template(self, filename, service, format='squonk')`
     :   Outputs a yaml template for a specified service.
         
         Values for the options will be output as 1, 1.0, or 'id' depending
@@ -185,6 +168,9 @@ Classes
             Name of the file to write to
         service : str
             Name of the service eg core.dataset.filter.slice.v1
+        format : str (optional)
+            Format that the input data files will be in. squonk, mod, or sdf.
+            The default is squonk
 
     `list_full_service_info(self, service_id)`
     :   Returns the service name and description.
@@ -256,3 +242,51 @@ Classes
         -------
         json
             Json for all the available services
+
+    `run_job(self, service=None, options={}, inputs=[], yaml=None)`
+    :   Runs a Squonk job
+        
+        The input options for the job can be defined either by parameters
+        passed into the function or read from a yaml file. If the yaml
+        file is specified then it will be used in preference. The yaml file
+        or values supplied via parameters are validated against the service
+        definition which is retreived from the server.
+        
+        Parameters
+        ----------
+        service : str
+            Name of the service eg core.dataset.filter.slice.v1
+        options : dict
+            The jobs options in the form of a dictionary
+        inputs : dict
+            The jobs file inputs in the form of a dictionary
+        yaml : str
+            A yaml file defining the job. A template file can be generated
+            using the function job_yaml_template
+        
+        Returns
+        -------
+        job_id : str
+            The id of the job that has been started.
+
+    `yaml_from_inputs(self, service=None, options={}, inputs=[], yaml=None)`
+    :   Generates a yaml file from job inputs specified 
+        
+        The input options for the job can be defined either by parameters
+        passed into the function or read from a yaml file. The values supplied
+        via parameters are validated against the service definition which is
+        retreived from the server.
+        
+        Parameters
+        ----------
+        service : str
+            Name of the service eg core.dataset.filter.slice.v1
+        options : dict
+            The jobs options in the form of a dictionary
+        inputs : dict
+            The jobs file inputs in the form of a dictionary
+        yaml : str
+            The name of a yaml file defining the job that will be generated.
+        
+        Returns
+        -------

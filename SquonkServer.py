@@ -44,7 +44,7 @@ class SquonkServer:
         response = None
         if type == 'get':
             headers = {'Authorization': str('bearer ' + token) }
-            response = requests.get(url, headers=headers, verify=False, allow_redirects=True)
+            response = requests.get(url, headers=headers, verify=True, allow_redirects=True)
         else:
             if type == 'post':
                 headers = {'Authorization': str('bearer ' + token), 'Content-Type': 'multipart/form'}
@@ -52,12 +52,12 @@ class SquonkServer:
             else:
                 if type == 'delete':
                     headers = {'Authorization': str('bearer ' + token) }
-                    response = requests.delete(url, headers=headers, verify=False, allow_redirects=True)
+                    response = requests.delete(url, headers=headers, verify=True, allow_redirects=True)
                 else:
                     raise SquonkException('type must be get, post or delete')
         status_code = response.status_code
         logging.debug('GOT response '+str(status_code))
-        if not response.status_code == 200:
+        if not response.status_code in [200, 201]:
             if response.status_code == 404:
                 print(response.text)
             else:
