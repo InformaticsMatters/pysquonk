@@ -1,8 +1,0 @@
-input_data:
-  input:
-    data: data/Kinase_inhibs.json.gz
-    meta: data/Kinase_inhibs.metadata
-options:
-  count: 3
-  skip: 2
-service_name: core.dataset.filter.slice.v1
