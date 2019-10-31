@@ -13,8 +13,6 @@ import pprint
 import sys
 import urllib
 
-from collections import namedtuple
-
 import requests
 import logging
 

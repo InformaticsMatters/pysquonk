@@ -33,6 +33,7 @@ class SquonkServer:
         self._auth = auth
         logging.debug('SquonkServer created:'+self._base_url)
 
+    # set a request
     def send(self,type,request,form_data=None):
         # Always try to refresh the access token.
         # The token is only refreshed if it is close to expiry.

@@ -1,15 +1,4 @@
-The API documentation is in squonk.md
-
-to run as a command, try:
-  python squonk.py -h
-
-the examples can be run using a command like:
-  python squonk.py -r yaml/pipelines.rdkit.sucos.o3da.yaml -d -o outdir
-from the pysquonk directory, where outdir is the directory where the job output
-should go. This assumes that config.ini has been editted with your username 
-and password.
-
-The documentation was created by running:
+The API documentation here was created by running:
   pdoc squonk.py -o doc --force
 
 from the top level directory

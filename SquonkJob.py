@@ -9,8 +9,6 @@
 import configparser
 import shutil, os
 import requests
-# import curlify
-# import auth
 import json
 import yaml
 import io
@@ -37,6 +35,7 @@ class SquonkJob:
         self._end_point = end_point
         self._job_id = None
 
+    # check the inputs to the SquonkJob after instantiation
     def check_input(self):
         # if there is yaml read it, loading in:
         if self._yaml:
@@ -84,7 +83,7 @@ class SquonkJob:
         response = self.job_def.get_definition(service_info)
         return response
 
-# write out a yaml file from the job inputs
+    # write out a yaml file from the job inputs
     def write_yaml(self, yaml_name):
         data = { 'service_name' : self._service,
                  'input_data' : self._inputs,
@@ -94,7 +93,7 @@ class SquonkJob:
 
     # validate the job inputs against the service definition
     def validate(self):
-        self.job_def.validate(self._options, self._inputs)
+        return self.job_def.validate(self._options, self._inputs)
 
     # run the job 
     def start(self, convert_on_server=True):
@@ -114,7 +113,8 @@ class SquonkJob:
         """
 
         # validate the job input options against the service definition
-        self.validate()
+        if not self.validate():
+            return False
 
         # get the input files
 

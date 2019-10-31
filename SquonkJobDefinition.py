@@ -131,7 +131,7 @@ class SquonkJobDefinition:
 
         return data
 
-# get the files data to create a job
+    # get the files data to create a job
     def get_job_files(self,inputs):
         files=[]
         for input in self.inputs:
@@ -188,11 +188,15 @@ class SquonkJobDefinition:
                 max = 1
                 if 'maxValues' in option_json:
                     max = option_json['maxValues']
-                if self.correct_type(options[key],type):
-                    return False
+                if not self.correct_type(options[key],type):
+                    logging.warning("option {} is of wrong type. shoud be {}:".format(key,type))
+        # TODO      everything seems to be the wrong type, but it still works
+        #           so commented out, the below, and changed above to warning.
+        #           return False
 
         # loop round the expected input files (json) and
         # check they exist
+
         expected_inputs = {}
         for input_json in self.inputs:
             name = input_json['name']
@@ -200,18 +204,24 @@ class SquonkJobDefinition:
             if not name in inputs:
                 print("ERROR: missing input file: " + name)
                 return False
+
+        # check that we either have 'data' and 'metadata' keywords or
+        # 'sdf' or 'mol'
+
         for input in expected_inputs:
             input_json = expected_inputs[name]
-            if not 'data' in input:
+            if not 'data' in inputs[input] and not 'sdf' in inputs[input] and not 'mol' in inputs[input]:
                 print("ERROR: no data: keyword for input file: " + name)
                 return False
             file_types = self._get_file_types(input_json)
             if 'meta' in file_types:
-                if not 'meta' in input:
-                    print("ERROR: no meta: keyword for input file: " + name)
-                    return False
+                if not 'sdf' in inputs[input] and not 'mol' in inputs[input]:
+                    if not 'meta' in inputs[input]:
+                        print("ERROR: no meta: keyword for input file: " + name)
+                        return False
+        return True
 
-# check option value of correct type.
+    # check option value of correct type.
     def correct_type(self,value,type):
         if type=='java.lang.Integer':
             if isinstance(value, int):
@@ -220,12 +230,13 @@ class SquonkJobDefinition:
             if isinstance(value, float):
                 return True
         if type=='java.lang.String':
-            if isinstance(value, int):
+            if isinstance(value, str):
                 return True
-        if type == 'org.squonk.types.NumberRange$Integer':
-            return _range(value, int)
-        if type == 'org.squonk.types.NumberRange$Float':
-            return _range(value, float)
+#  Range check is commented out because some jobs don't follow this format.
+#       if type == 'org.squonk.types.NumberRange$Integer':
+#           return _range(value, int)
+#       if type == 'org.squonk.types.NumberRange$Float':
+#           return _range(value, float)
 
         return False
 

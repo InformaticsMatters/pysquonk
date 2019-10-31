@@ -1,7 +1,7 @@
 #! /usr/bin/env python
-"""Python script to convert mol or sdf files to squonk.
+"""Python script to sdf files to squonk.
 
-   usage: mol2squonk.py <in_file> <out_base>
+   usage: sdf2squonk.py <in_file> <out_base>
  
    reads <in_file> and writes <out_base>.data and <out_base>.metadata
 

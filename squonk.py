@@ -582,7 +582,15 @@ class Squonk:
         """
 
         logging.info('getting results for job: ' + job_id)
+
+        # stop the warning for a parse error due to whitespace in the
+        # headers
+        logging.getLogger("urllib3").setLevel(logging.ERROR)
+
         response = self.server.send('get', self._config['jobs_endpoint'] + job_id + '/results')
+
+        # put the logging level back
+        logging.getLogger("urllib3").setLevel(logging.INFO)
         if not response:
             return response
         logging.debug('parsing response ....')

@@ -15,6 +15,8 @@ args = parser.parse_args()
 
 if args.debug:
     logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.INFO)
 
 # user name and password and set config
 username = args.username
