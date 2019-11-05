@@ -262,3 +262,110 @@ def history(field,date,filename):
     data = '[' + date + ']'
     data += ' Added field ' + field
     return data
+
+def peek(file_name,report=True,field=None):
+    """
+    Looks at a file and tries to guess what type it is
+    Reports some information about the file.
+    Unzips the file first if it name ends in .gz
+
+    Parameters
+    ----------
+    file_name: str
+        name of the file. if it ends in gz is assumed to be gzipped
+    report: bool
+        if true, writes out info about the file.
+
+    Returns
+    -------
+    Returns a string representing the apparent file type
+    """
+
+    file_data = ''
+    file_base, file_ext = os.path.splitext(file_name)
+    if file_ext == '.gz':
+        file_base, file_ext = os.path.splitext(file_base)
+        debug('opening gzipped file:' + file_name)
+        with gzip.open(file_name, 'rt') as f:
+            file_data = f.read()
+    else:
+        debug('opening ordinary file:' + file_name)
+        with open(file_name, 'r') as f:
+            file_data = f.read()
+
+    return (guess_type(file_data,report,field))
+
+def guess_type(file_data,report=True,field=None):
+    """
+    Looks at file_data and tries to guess what type it is
+    Reports some information about the file.
+
+    Parameters
+    ----------
+    file_data: str
+        data read from the file.
+    report: bool
+        if true, writes out info about the file.
+
+    Returns
+    -------
+    Returns a string representing the apparent file type
+    """
+    file_type = 'unknown'
+    if len(file_data) < 8:
+        if report:
+            print('Less than 8 characters file type not known')
+        return file_type
+
+    if file_data[0:7] == '[{"uuid' or file_data[0:7] == '[{"sour':
+        file_type = 'data'
+        if report:
+            print('Looks like squonk dataset')
+        
+        json_data = json.loads(file_data)
+        squonk_check(json_data, report, field)
+        return file_type
+
+    if file_data[0:7] == '{"type':
+        file_type = 'meta'
+        if report:
+            print('Looks like squonk meta data')
+        return file_type
+
+    if 'M  END' in file_data:
+        if '$$$$' in file_data:
+            file_type = 'sdf'
+            if report:
+                print('sdf file')
+        else:
+            file_type = 'mol'
+            if report:
+                print('mol file')
+        data, meta, rcode = str2squonk(file_data, file_type, 'file_name')
+        if rcode == 0:
+            print('Converted to squonk, checking ...')
+        squonk_check(data, report, field)
+    else:
+        if report:
+            print('File type unknown')
+    return file_type
+
+def squonk_check(file_data, report, field):
+    json_data = file_data
+    nrecs = len(json_data)
+    if report:
+        print('Number of Records:' + str(nrecs))
+    values = json_data[0]['values']
+    if report:
+        print('Values in first records:' + str(values))
+    if field:
+        fields={}
+        for mol in json_data:
+            fval=mol['values'][field]
+            if fval in fields:
+                fields[fval] += 1
+            else:
+                fields[fval] = 1
+        if report:
+            print('values of: ' + field)
+            print(fields)

@@ -243,7 +243,18 @@ Classes
         json
             Json for all the available services
 
-    `run_job(self, service=None, options={}, inputs=[], yaml=None)`
+    `ping(self)`
+    :   Checks that the service can be reached.
+        
+        Parameters
+        ----------
+        
+        Returns
+        -------
+        boolean
+            True if ok, False otherwise.
+
+    `run_job(self, service=None, options={}, inputs=[], yaml=None, convert_onserver=True)`
     :   Runs a Squonk job
         
         The input options for the job can be defined either by parameters

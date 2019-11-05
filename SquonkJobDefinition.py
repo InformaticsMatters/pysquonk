@@ -194,10 +194,8 @@ class SquonkJobDefinition:
                 if 'maxValues' in option_json:
                     max = option_json['maxValues']
                 if not self.correct_type(options[key],type_):
-                    logging.warning("option {} is of wrong type. shoud be {}:".format(key,type_))
-        # TODO      everything seems to be the wrong type, but it still works
-        #           so commented out, the below, and changed above to warning.
-        #           return False
+                    logging.error("option {} is of wrong type. shoud be {}:".format(key,type_))
+                    return False
 
         # loop round the expected input files (json) and
         # check they exist

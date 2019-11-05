@@ -5,9 +5,10 @@ inputs:
     meta: data/Kinase_inhibs.metadata
 options:
   query.LogP_RDKit: 1.0|4.0
-# query.filterMode: INCLUDE_PASS # INCLUDE_PASS, INCLUDE_FAIL, INCLUDE_ALL
+  query.filterMode: INCLUDE_PASS # INCLUDE_PASS, INCLUDE_FAIL, INCLUDE_ALL
 # query.filterThreshold: 1
-# query.ExactMW_RDKit: {'@class': 'org.squonk.types.NumberRange$Float', 'minValue': 0.0, 'maxValue': 500.0}
+  query.ExactMW_RDKit: 0.0|500.0
 # query.LogP_RDKit: {'@class': 'org.squonk.types.NumberRange$Float', 'maxValue': 5.0}
-# query.HBD_Lip_RDKit: {'@class': 'org.squonk.types.NumberRange$Integer', 'minValue': 0, 'maxValue': 5}
-# query.HBA_LIP_RDKit: {'@class': 'org.squonk.types.NumberRange$Integer', 'minValue': 0, 'maxValue': 10}
+  query.LogP_RDKit: 0.0|5.0
+  query.HBD_Lip_RDKit: 0|5
+  query.HBA_LIP_RDKit: 0|10

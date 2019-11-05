@@ -8,6 +8,4 @@ inputs:
     sdf: data/ChemblActivitiesFetcher3.sdf
 options:
   mergeFieldName: 'ChemblID'
-# keepFirst: 'true'
-# keepFirst: true
   keepFirst: True

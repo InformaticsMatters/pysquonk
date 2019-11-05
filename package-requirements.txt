@@ -8,4 +8,4 @@ pyroma == 2.5
 
 # In order to run 'python setup.py bdist_wheel'...
 wheel == 0.33.4
-
+twine==2.0.0
