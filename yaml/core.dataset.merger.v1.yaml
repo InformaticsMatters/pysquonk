@@ -1,0 +1,13 @@
+service_name: core.dataset.merger.v1
+inputs:
+  input1:
+    sdf: data/ChemblActivitiesFetcher1.sdf
+  input2:
+    sdf: data/ChemblActivitiesFetcher2.sdf
+  input3:
+    sdf: data/ChemblActivitiesFetcher3.sdf
+options:
+  mergeFieldName: 'ChemblID'
+# keepFirst: 'true'
+# keepFirst: true
+  keepFirst: True

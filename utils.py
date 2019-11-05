@@ -14,6 +14,46 @@ from logging import debug, error
 # semantic 2.0.0 rules.
 __version__ = '1.0.0'
 
+def tobasic(file_name):
+    """
+    Converts a squonk org.squonk.types.MoleculeObject to 
+    org.squonk.types.BasicObject
+    Unzips the file first if it name ends in .gz
+
+    Parameters
+    ----------
+    file_name: str
+        name of the file. if it ends in gz is assumed to be gzipped
+
+    Returns
+    -------
+    Returns a string containing the file data
+    """
+
+    file_data = ''
+    file_base, file_ext = os.path.splitext(file_name)
+    if file_ext == '.gz':
+        file_base, file_ext = os.path.splitext(file_base)
+        debug('opening gzipped file:' + file_name)
+        with gzip.open(file_name, 'rt') as f:
+            file_data = f.read()
+    else:
+        debug('opening ordinary file:' + file_name)
+        with open(file_name, 'r') as f:
+            file_data = f.read()
+
+    json_data = json.loads(file_data)
+    new_json=[]
+    count=0
+    for mol in json_data:
+        count+=1
+        mol['source'] = mol['values']['SMI']
+        del(mol['values'])
+        new_json.append(mol)
+
+    meta_data = {'type':'org.squonk.types.BasicObject','size':count}
+    return (new_json, meta_data)
+
 def mol2sdf(file_name):
     """
     Converts a mol format file to sdf by adding $$$$ onto the end.

@@ -6,4 +6,4 @@ inputs:
   queryMol:
     mol: data/pyrimethamine.mol
 options:
-  arg.crippen: 'false'
+  arg.crippen: true

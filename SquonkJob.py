@@ -114,19 +114,22 @@ class SquonkJob:
 
         # validate the job input options against the service definition
         if not self.validate():
+            log.error('Job validation failed')
             return False
 
         # get the input files
 
         files = self.job_def.get_job_files(self._inputs)
-        if not files:
-            return False
         log.debug(files)
 
         # format the options form data
+        # need to convert quotes and True/False to get the options string
+        # from a dictionary into the format needed by the server
 
         data_opt_str = '{}'.format(self._options)
         data_opt_str = data_opt_str.replace("'", '"')
+        data_opt_str = data_opt_str.replace("True", "true")
+        data_opt_str = data_opt_str.replace("False", "false")
         log.debug(data_opt_str)
 
         form_data = { 'options': data_opt_str }

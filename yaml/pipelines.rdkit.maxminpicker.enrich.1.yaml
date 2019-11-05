@@ -11,4 +11,4 @@ options:
   arg.fragment_method: hac
   arg.num: 100
   arg.threshold: 0.5
-  arg.output_fragment: 'False'
+  arg.output_fragment: False

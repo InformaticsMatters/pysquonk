@@ -46,8 +46,10 @@ class SquonkJobDefinition:
 
     # set job definition from service info 
     def get_definition(self,job_json):
-        self.inputs = job_json['inputDescriptors']
-        self.options = job_json['optionDescriptors']
+        if 'inputDescriptors' in job_json:
+            self.inputs = job_json['inputDescriptors']
+        if 'optionDescriptors' in job_json:
+            self.options = job_json['optionDescriptors']
 
     # write out a template yaml file from the definition
     def template(self, yaml_name, format='squonk'):
@@ -135,7 +137,10 @@ class SquonkJobDefinition:
     def get_job_files(self,inputs):
         files=[]
         for input in self.inputs:
+            # some inputs may not be present eg in core.dataset.merger.v1
             name = input['name']
+            if not name in inputs:
+                continue
             input_value = inputs[name]
             format = 'error'
             if 'data' in input_value:
@@ -184,12 +189,12 @@ class SquonkJobDefinition:
         for key in options:
             if key in expected_options:
                 options_json = expected_options[key]
-                type = option_json['typeDescriptor']['type']
+                type_ = options_json['typeDescriptor']['type']
                 max = 1
                 if 'maxValues' in option_json:
                     max = option_json['maxValues']
-                if not self.correct_type(options[key],type):
-                    logging.warning("option {} is of wrong type. shoud be {}:".format(key,type))
+                if not self.correct_type(options[key],type_):
+                    logging.warning("option {} is of wrong type. shoud be {}:".format(key,type_))
         # TODO      everything seems to be the wrong type, but it still works
         #           so commented out, the below, and changed above to warning.
         #           return False
@@ -202,23 +207,26 @@ class SquonkJobDefinition:
             name = input_json['name']
             expected_inputs[name] = input_json
             if not name in inputs:
-                print("ERROR: missing input file: " + name)
-                return False
+                print("WARNING: missing input file: " + name)
+            # downgraded to a warning because some services don't need all
+            # inputs, eg core.dataset.enricher.v1.yaml
+            #   return False
 
         # check that we either have 'data' and 'metadata' keywords or
         # 'sdf' or 'mol'
 
         for input in expected_inputs:
-            input_json = expected_inputs[name]
-            if not 'data' in inputs[input] and not 'sdf' in inputs[input] and not 'mol' in inputs[input]:
-                print("ERROR: no data: keyword for input file: " + name)
-                return False
+            input_json = expected_inputs[input]
             file_types = self._get_file_types(input_json)
-            if 'meta' in file_types:
-                if not 'sdf' in inputs[input] and not 'mol' in inputs[input]:
-                    if not 'meta' in inputs[input]:
-                        print("ERROR: no meta: keyword for input file: " + name)
-                        return False
+            if input in inputs:
+                if not 'data' in inputs[input] and not 'sdf' in inputs[input] and not 'mol' in inputs[input]:
+                    print("ERROR: no data: keyword for input file: " + name)
+                    return False
+                if 'meta' in file_types:
+                    if not 'sdf' in inputs[input] and not 'mol' in inputs[input]:
+                        if not 'meta' in inputs[input]:
+                            print("ERROR: no meta: keyword for input file: " + name)
+                            return False
         return True
 
     # check option value of correct type.
@@ -229,14 +237,19 @@ class SquonkJobDefinition:
         if type=='java.lang.Float':
             if isinstance(value, float):
                 return True
+        if type=='java.lang.Boolean':
+            if isinstance(value, bool):
+                return True
         if type=='java.lang.String':
             if isinstance(value, str):
                 return True
-#  Range check is commented out because some jobs don't follow this format.
-#       if type == 'org.squonk.types.NumberRange$Integer':
+#       Range check is commented out because some jobs don't follow this format.
+        if type == 'org.squonk.types.NumberRange$Integer':
 #           return _range(value, int)
-#       if type == 'org.squonk.types.NumberRange$Float':
+            return True
+        if type == 'org.squonk.types.NumberRange$Float':
 #           return _range(value, float)
+            return True
 
         return False
 

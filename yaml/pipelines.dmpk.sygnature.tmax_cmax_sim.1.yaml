@@ -1,0 +1,8 @@
+service_name: pipelines.dmpk.sygnature.tmax_cmax_sim.1
+inputs: {}
+options:
+  arg.halfLife: 0.79
+  arg.absorption: 0.5
+  arg.dose: 0.14
+  arg.auc: 0.88
+  arg.time: 8.0

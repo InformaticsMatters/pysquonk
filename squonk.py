@@ -351,6 +351,8 @@ class Squonk:
             info = self.list_full_service_info(service)
             job.initialise(info)
             job.write_yaml(yaml)
+        else:
+            print('Failed checking job input')
 
     def run_job(self, service=None, options={}, inputs=[], yaml=None, convert_onserver=True):
         """
@@ -398,6 +400,7 @@ class Squonk:
 
             return job_id
         else:
+            print('Failed checking job input')
             return False
 
     # get your jobs
@@ -626,9 +629,17 @@ class Squonk:
             file_name = os.path.join( dir, file_name)
         logging.info('Writing: ' + file_name)
 
+        # extract the content
+        content_type = self._get_content_type(part.headers)
+        print(content_type)
+        content = part.content
+        mode = 'wb'
+        if content_type != 'image/png':
+            content = part.content.decode()
+            mode = 'w'
+
         # write out the file.
-        content = part.content.decode()
-        with open(file_name, 'w') as f:
+        with open(file_name, mode) as f:
             f.write(content)
             f.close()
 

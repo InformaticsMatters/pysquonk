@@ -1,0 +1,6 @@
+service_name: cdk.donors_acceptors
+inputs:
+  input:
+    data: data/Kinase_inhibs.json.gz
+    meta: data/Kinase_inhibs.metadata
+options:

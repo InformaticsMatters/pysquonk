@@ -1,0 +1,7 @@
+service_name: rdkit.calculators.canonical_smiles
+inputs:
+  input:
+    data: data/Kinase_inhibs.json.gz
+    meta: data/Kinase_inhibs.metadata
+options:
+  query.mode: WHOLE_MOLECULE # WHOLE_MOLECULE, BIGGEST_BY_ATOM_COUNT, BIGGEST_BY_HEAVY_ATOM_COUNT, BIGGEST_BY_MOLWEIGHT

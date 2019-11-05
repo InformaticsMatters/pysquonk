@@ -1,0 +1,11 @@
+service_name: pipelines.rdkit.screen.multi
+inputs:
+  query:
+    sdf: data/mols.sdf
+  target:
+    sdf: data/benzene.sdf
+options:
+  arg.sim: {'@class': 'org.squonk.types.NumberRange$Float', 'minValue': 0.7, 'maxValue': 1.0}
+# arg.sim: {'@class': 'org.squonk.types.NumberRange$Float', 'minValue': 0.7, 'maxValue': 1.0}
+  arg.descriptor: rdkit # maccs, morgan2, morgan3, rdkit
+  arg.metric: tanimoto # asymmetric, braunblanquet, cosine, dice, kulczynski, mcconnaughey, rogotgoldberg, russel, sokal, tanimoto
