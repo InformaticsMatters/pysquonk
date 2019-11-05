@@ -2,6 +2,8 @@ import setuptools
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
+with open("requirements.txt", "r") as fh:
+    requirements = fh.read().splitlines()
 
 setuptools.setup(
     name="im-pysquonk",
@@ -19,5 +21,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
+    py_modules=["SquonkAuth", "SquonkJobDefinition", "SquonkJob", "SquonkServer", "squonk", "utils"],
+    install_requires=requirements
 )
 
