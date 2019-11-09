@@ -27,5 +27,5 @@ if len(sys.argv)>2:
 mtime=time.ctime(os.path.getmtime(file_name))
 print('File modification time='+str(mtime))
 
-file_type = peek(file_name,True,field)
-print("Guessed file type of:"+file_type)
+file_info = peek(file_name,True,field)
+print(file_info)

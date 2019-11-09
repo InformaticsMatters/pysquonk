@@ -22,6 +22,9 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     py_modules=["SquonkAuth", "SquonkJobDefinition", "SquonkJob", "SquonkServer", "squonk", "utils"],
-    install_requires=requirements
+    install_requires=requirements,
+    entry_points = {
+        'console_scripts': ['pysquonk=squonk:main'],
+    }
 )
 

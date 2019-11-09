@@ -7,3 +7,6 @@ inputs:
     mol: data/pyrimethamine.mol
 options:
   arg.crippen: true
+  arg.qmolidx: 1
+# arg.threshold: 10
+  arg.num: 1

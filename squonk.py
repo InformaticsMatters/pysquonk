@@ -120,6 +120,8 @@ class Squonk:
         # otherwise read the config file
 
         else:
+            if not os.path.isfile(config_file):
+                raise Exception(config_file + ' does not exist')
             self._config = {}
             settings = configparser.ConfigParser()
             settings._interpolation = configparser.ExtendedInterpolation()
@@ -247,7 +249,7 @@ class Squonk:
             out = [method for method in response if method['id'] == service_id]
             return out
         else:
-            response
+            return response
 
     def list_full_service_info(self, service_id):
         """
@@ -528,6 +530,8 @@ class Squonk:
 
         Returns
         -------
+        status: str
+            The job status
 
         """
         status = self.job_status(job_id)
@@ -541,6 +545,7 @@ class Squonk:
                 self.job_delete(job_id)
         else:
             print('Job Failed status='+status)
+        return status
 
     # get content type from the header
     def _get_content_type(self,header):
@@ -626,7 +631,11 @@ class Squonk:
         # if the user gave a directory, prepend to file name
 
         if dir:
-            file_name = os.path.join( dir, file_name)
+            if not os.path.exists(dir):
+                logging.error('Specified directory: {} does not exist'.format(dir) )
+                return
+            else:
+                file_name = os.path.join( dir, file_name)
         logging.info('Writing: ' + file_name)
 
         # extract the content
@@ -643,12 +652,7 @@ class Squonk:
             f.write(content)
             f.close()
 
-# -----------------------------------------------------------------------------
-# MAIN
-# -----------------------------------------------------------------------------
-
-if __name__ == '__main__':
-
+def main():
 
     # Get command line
 
@@ -677,10 +681,10 @@ if __name__ == '__main__':
         logging.debug("Got service: " + args.service)
  
     if not args.service and not args.yaml:
-        print("You must specify --template or --yaml")
+        print("You must specify --service or --yaml")
         exit()
     if args.service and args.yaml:
-        print("You can't specify --template and --yaml")
+        print("You can't specify --service and --yaml")
         exit()
 
     # Create a Squonk object
@@ -703,8 +707,16 @@ if __name__ == '__main__':
     # Otherwise assume its a service name
     if args.service:
         file_name = args.service
+
+        # prepend directory to filename if specified
+
         if args.dir:
+            if not os.path.exists(args.dir):
+                logging.error('Directory {} does not exist'.format(dir))
             file_name = os.path.join(args.dir, file_name)
+
+        # full service info requested:
+
         if args.info:
             file_name += '.json'
             info = squonk.list_full_service_info(args.service)
@@ -712,7 +724,18 @@ if __name__ == '__main__':
             with open(file_name, 'w') as f:
                 f.write(json.dumps(info, indent=4))
                 f.close()
+
+        # yaml template requested
+
         else:
             file_name += '.yaml'
             logging.info('Writing out file ' + file_name )
             squonk.job_yaml_template(file_name, args.service, args.format)
+
+# -----------------------------------------------------------------------------
+# MAIN
+# -----------------------------------------------------------------------------
+
+if __name__ == '__main__':
+
+    main()

@@ -1,20 +1,57 @@
 # pysquonk
+PySquonk
+========
 
-The API documentation is in doc/squonk.md
+Pysquonk is a python API wrapper round the Informatics Matters Squonk Rest
+ Services. It can be used to submit jobs, check their status and retreive
+the jobs results. It can be used in two ways:
+- from the command line
+- writing python scripts using the API
 
-Running from the command line is also possible, for options run:
 
-  python squonk.py -h
+Installation
+------------
 
-The examples can be run using a command like:
+From github https://github.com/InformaticsMatters/pysquonk
 
-  python squonk.py -r yaml/pipelines.rdkit.sucos.o3da.yaml -d -o outdir
+From pip:
+  pip install im-pysquonk
 
-from the pysquonk directory, where outdir is the directory where the job output
-should go. This assumes that config.ini has been editted with your username 
-and password (or you can pass username and password as command line options)
+Running from the command line
+-----------------------------
 
-To run all the test jobs in the yaml sub directory:
+Copy the file config.ini from github and save it into the directory you are going to run the command from. Edit your username and password into the file, or
+pass them via the command line (see below). The job to run is specified using
+yaml files. Examples of yaml files for various jobs are available in the yaml
+directory. For example, if you installed with pip, the command;
+
+  pysquonk -r yaml/pipelines.rdkit.sucos.o3da.yaml -o outdir
+
+will run the job defined by the file pipelines.rdkit.sucos.o3da.yaml and write its output to the directory outdir. To get help run.
+
+  pysquonk -h
+
+If you did install pysquonk via pip, but you have a directory SQUONKDIR containing the contents of the repository then the command would be:
+
+  python SQUONKDIR/squonk -h
+
+If you want to run a job that does not have an example in the yaml directory,
+then the command:
+
+  pysquonk -s pipelines.rdkit.sucos.o3da -o outdir
+
+will write out an example yaml file that you can amend to directory outdir
+
+Using the Python API
+--------------------
+
+The API documentation is in [doc/squonk.md](doc/squonk.md). There is an example program in test_harness.py
+
+
+Development and Testing
+-----------------------
+
+To run all the test jobs in the yaml sub directory, from the top level of the repo run:
 
   python test_jobs.py
 
