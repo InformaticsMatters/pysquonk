@@ -38,6 +38,13 @@ parameters passed in and then run a job. See example program below:
 
     squonk.job_wait(job_id)
 
+Functions
+---------
+
+    
+`main()`
+:   
+
 Classes
 -------
 
@@ -155,6 +162,8 @@ Classes
         
         Returns
         -------
+        status: str
+            The job status
 
     `job_yaml_template(self, filename, service, format='squonk')`
     :   Outputs a yaml template for a specified service.
