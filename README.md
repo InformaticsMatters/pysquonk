@@ -17,6 +17,8 @@ From github https://github.com/InformaticsMatters/pysquonk
 From pip:
   pip install im-pysquonk
 
+(note if you install from pip you get a script so you can also just run from the command line using the command pysquonk without specifiying the full path)
+
 Running from the command line
 -----------------------------
 
@@ -31,7 +33,7 @@ will run the job defined by the file pipelines.rdkit.sucos.o3da.yaml and write i
 
   pysquonk -h
 
-If you did install pysquonk via pip, but you have a directory SQUONKDIR containing the contents of the repository then the command would be:
+If you did not install pysquonk via pip, but you have a directory SQUONKDIR containing the contents of the repository then the command would be:
 
   python SQUONKDIR/squonk -h
 
@@ -40,12 +42,13 @@ then the command:
 
   pysquonk -s pipelines.rdkit.sucos.o3da -o outdir
 
-will write out an example yaml file that you can amend to directory outdir
+will write out an example yaml file to directory outdir. You can then amend this as required.
 
 Using the Python API
 --------------------
 
-The API documentation is in [doc/squonk.md](doc/squonk.md). There is an example program in test_harness.py
+The API documentation is in [doc/squonk.md](doc/squonk.md). There are some examples of usage there and also there is an example program in test_harness.py.
+There is also a Jupyter notebook which shows how to use the API.
 
 
 Development and Testing
@@ -61,3 +64,9 @@ To run the script that executes the API functions:
 
   python test_harness.py
 (will prompt for username and password).
+
+To upload a new version to pip:
+ - update the version number in setup.py
+ - rm dist/*
+ - python setup.py bdist_wheel
+ - twine upload dist/*

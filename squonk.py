@@ -282,6 +282,8 @@ class Squonk:
         ----------
         service_id : str
             Name of the service eg core.dataset.filter.slice.v1
+        field : str
+            Name of the field from the service info required.
 
         Returns
         -------

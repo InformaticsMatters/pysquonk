@@ -7,7 +7,7 @@ with open("requirements.txt", "r") as fh:
 
 setuptools.setup(
     name="im-pysquonk",
-    version="1.0.0",
+    version="1.0.1",
     author="Malcolm Peacock",
     author_email="malcolm@popmalc.org.uk",
     description="Pysquonk rest server API",
