@@ -1,2 +1,2 @@
-PyYAML==5.1.2
+PyYAML==5.4
 requests-toolbelt==0.9.1
